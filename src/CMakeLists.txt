@@ -23,3 +23,7 @@ add_subdirectory(cmd)
 if (BARRIER_BUILD_GUI)
     add_subdirectory(gui)
 endif()
+
+if (CMAKE_BUILD_TESTS)
+    add_subdirectory(test)
+endif()
