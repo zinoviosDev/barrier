@@ -26,8 +26,7 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// Author: wan@google.com (Zhanyong Wan)
+
 
 // Google Mock - a framework for writing C++ mock classes.
 //
@@ -37,10 +36,13 @@
 
 #include <string>
 #include "gtest/gtest.h"
+#include "gtest/internal/custom/gtest.h"
 
+#if !defined(GTEST_CUSTOM_INIT_GOOGLE_TEST_FUNCTION_)
+
+using testing::GMOCK_FLAG(default_mock_behavior);
 using testing::GMOCK_FLAG(verbose);
 using testing::InitGoogleMock;
-using testing::internal::g_init_gtest_count;
 
 // Verifies that calling InitGoogleMock() on argv results in new_argv,
 // and the gmock_verbose flag's value is set to expected_gmock_verbose.
@@ -49,9 +51,9 @@ void TestInitGoogleMock(const Char* (&argv)[M], const Char* (&new_argv)[N],
                         const ::std::string& expected_gmock_verbose) {
   const ::std::string old_verbose = GMOCK_FLAG(verbose);
 
-  int argc = M;
+  int argc = M - 1;
   InitGoogleMock(&argc, const_cast<Char**>(argv));
-  ASSERT_EQ(N, argc) << "The new argv has wrong number of elements.";
+  ASSERT_EQ(N - 1, argc) << "The new argv has wrong number of elements.";
 
   for (int i = 0; i < N; i++) {
     EXPECT_STREQ(new_argv[i], argv[i]);
@@ -102,6 +104,26 @@ TEST(InitGoogleMockTest, ParsesSingleFlag) {
   TestInitGoogleMock(argv, new_argv, "info");
 }
 
+TEST(InitGoogleMockTest, ParsesMultipleFlags) {
+  int old_default_behavior = GMOCK_FLAG(default_mock_behavior);
+  const wchar_t* argv[] = {
+    L"foo.exe",
+    L"--gmock_verbose=info",
+    L"--gmock_default_mock_behavior=2",
+    NULL
+  };
+
+  const wchar_t* new_argv[] = {
+    L"foo.exe",
+    NULL
+  };
+
+  TestInitGoogleMock(argv, new_argv, "info");
+  EXPECT_EQ(2, GMOCK_FLAG(default_mock_behavior));
+  EXPECT_NE(2, old_default_behavior);
+  GMOCK_FLAG(default_mock_behavior) = old_default_behavior;
+}
+
 TEST(InitGoogleMockTest, ParsesUnrecognizedFlag) {
   const char* argv[] = {
     "foo.exe",
@@ -133,25 +155,6 @@ TEST(InitGoogleMockTest, ParsesGoogleMockFlagAndUnrecognizedFlag) {
   };
 
   TestInitGoogleMock(argv, new_argv, "error");
-}
-
-TEST(InitGoogleMockTest, CallsInitGoogleTest) {
-  const int old_init_gtest_count = g_init_gtest_count;
-  const char* argv[] = {
-    "foo.exe",
-    "--non_gmock_flag=blah",
-    "--gmock_verbose=error",
-    NULL
-  };
-
-  const char* new_argv[] = {
-    "foo.exe",
-    "--non_gmock_flag=blah",
-    NULL
-  };
-
-  TestInitGoogleMock(argv, new_argv, "error");
-  EXPECT_EQ(old_init_gtest_count + 1, g_init_gtest_count);
 }
 
 TEST(WideInitGoogleMockTest, ParsesInvalidCommandLine) {
@@ -195,6 +198,26 @@ TEST(WideInitGoogleMockTest, ParsesSingleFlag) {
   TestInitGoogleMock(argv, new_argv, "info");
 }
 
+TEST(WideInitGoogleMockTest, ParsesMultipleFlags) {
+  int old_default_behavior = GMOCK_FLAG(default_mock_behavior);
+  const wchar_t* argv[] = {
+    L"foo.exe",
+    L"--gmock_verbose=info",
+    L"--gmock_default_mock_behavior=2",
+    NULL
+  };
+
+  const wchar_t* new_argv[] = {
+    L"foo.exe",
+    NULL
+  };
+
+  TestInitGoogleMock(argv, new_argv, "info");
+  EXPECT_EQ(2, GMOCK_FLAG(default_mock_behavior));
+  EXPECT_NE(2, old_default_behavior);
+  GMOCK_FLAG(default_mock_behavior) = old_default_behavior;
+}
+
 TEST(WideInitGoogleMockTest, ParsesUnrecognizedFlag) {
   const wchar_t* argv[] = {
     L"foo.exe",
@@ -228,24 +251,7 @@ TEST(WideInitGoogleMockTest, ParsesGoogleMockFlagAndUnrecognizedFlag) {
   TestInitGoogleMock(argv, new_argv, "error");
 }
 
-TEST(WideInitGoogleMockTest, CallsInitGoogleTest) {
-  const int old_init_gtest_count = g_init_gtest_count;
-  const wchar_t* argv[] = {
-    L"foo.exe",
-    L"--non_gmock_flag=blah",
-    L"--gmock_verbose=error",
-    NULL
-  };
-
-  const wchar_t* new_argv[] = {
-    L"foo.exe",
-    L"--non_gmock_flag=blah",
-    NULL
-  };
-
-  TestInitGoogleMock(argv, new_argv, "error");
-  EXPECT_EQ(old_init_gtest_count + 1, g_init_gtest_count);
-}
+#endif  // !defined(GTEST_CUSTOM_INIT_GOOGLE_TEST_FUNCTION_)
 
 // Makes sure Google Mock flags can be accessed in code.
 TEST(FlagTest, IsAccessibleInCode) {

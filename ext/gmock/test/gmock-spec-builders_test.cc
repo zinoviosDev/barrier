@@ -26,8 +26,7 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// Author: wan@google.com (Zhanyong Wan)
+
 
 // Google Mock - a framework for writing C++ mock classes.
 //
@@ -81,21 +80,26 @@ using testing::Gt;
 using testing::InSequence;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
+using testing::IsNotSubstring;
 using testing::IsSubstring;
 using testing::Lt;
 using testing::Message;
 using testing::Mock;
+using testing::NaggyMock;
 using testing::Ne;
 using testing::Return;
+using testing::SaveArg;
 using testing::Sequence;
+using testing::SetArgPointee;
 using testing::internal::ExpectationTester;
 using testing::internal::FormatFileLocation;
-using testing::internal::g_gmock_mutex;
+using testing::internal::kAllow;
 using testing::internal::kErrorVerbosity;
+using testing::internal::kFail;
 using testing::internal::kInfoVerbosity;
+using testing::internal::kWarn;
 using testing::internal::kWarningVerbosity;
-using testing::internal::String;
-using testing::internal::string;
+using testing::internal::linked_ptr;
 
 #if GTEST_HAS_STREAM_REDIRECTION
 using testing::HasSubstr;
@@ -133,14 +137,21 @@ void PrintTo(const Incomplete& /* x */, ::std::ostream* os) {
 
 class Result {};
 
+// A type that's not default constructible.
+class NonDefaultConstructible {
+ public:
+  explicit NonDefaultConstructible(int /* dummy */) {}
+};
+
 class MockA {
  public:
   MockA() {}
 
-  MOCK_METHOD1(DoA, void(int n));  // NOLINT
-  MOCK_METHOD1(ReturnResult, Result(int n));  // NOLINT
-  MOCK_METHOD2(Binary, bool(int x, int y));  // NOLINT
-  MOCK_METHOD2(ReturnInt, int(int x, int y));  // NOLINT
+  MOCK_METHOD1(DoA, void(int n));
+  MOCK_METHOD1(ReturnResult, Result(int n));
+  MOCK_METHOD0(ReturnNonDefaultConstructible, NonDefaultConstructible());
+  MOCK_METHOD2(Binary, bool(int x, int y));
+  MOCK_METHOD2(ReturnInt, int(int x, int y));
 
  private:
   GTEST_DISALLOW_COPY_AND_ASSIGN_(MockA);
@@ -155,6 +166,16 @@ class MockB {
 
  private:
   GTEST_DISALLOW_COPY_AND_ASSIGN_(MockB);
+};
+
+class ReferenceHoldingMock {
+ public:
+  ReferenceHoldingMock() {}
+
+  MOCK_METHOD1(AcceptReference, void(linked_ptr<MockA>*));
+
+ private:
+  GTEST_DISALLOW_COPY_AND_ASSIGN_(ReferenceHoldingMock);
 };
 
 // Tests that EXPECT_CALL and ON_CALL compile in a presence of macro
@@ -621,7 +642,7 @@ TEST(ExpectCallSyntaxTest, WarnsOnTooManyActions) {
     b.DoB(1);
     b.DoB(2);
   }
-  const String output = GetCapturedStdout();
+  const std::string output = GetCapturedStdout();
   EXPECT_PRED_FORMAT2(
       IsSubstring,
       "Too many actions specified in EXPECT_CALL(b, DoB())...\n"
@@ -663,7 +684,7 @@ TEST(ExpectCallSyntaxTest, WarnsOnTooFewActions) {
 
   CaptureStdout();
   b.DoB();
-  const String output = GetCapturedStdout();
+  const std::string output = GetCapturedStdout();
   EXPECT_PRED_FORMAT2(
       IsSubstring,
       "Too few actions specified in EXPECT_CALL(b, DoB())...\n"
@@ -671,6 +692,60 @@ TEST(ExpectCallSyntaxTest, WarnsOnTooFewActions) {
       "but has only 1 WillOnce().",
       output);
   b.DoB();
+}
+
+TEST(ExpectCallSyntaxTest, WarningIsErrorWithFlag) {
+  int original_behavior = testing::GMOCK_FLAG(default_mock_behavior);
+
+  testing::GMOCK_FLAG(default_mock_behavior) = kAllow;
+  CaptureStdout();
+  {
+    MockA a;
+    a.DoA(0);
+  }
+  std::string output = GetCapturedStdout();
+  EXPECT_TRUE(output.empty()) << output;
+
+  testing::GMOCK_FLAG(default_mock_behavior) = kWarn;
+  CaptureStdout();
+  {
+    MockA a;
+    a.DoA(0);
+  }
+  std::string warning_output = GetCapturedStdout();
+  EXPECT_PRED_FORMAT2(IsSubstring, "GMOCK WARNING", warning_output);
+  EXPECT_PRED_FORMAT2(IsSubstring, "Uninteresting mock function call",
+                      warning_output);
+
+  testing::GMOCK_FLAG(default_mock_behavior) = kFail;
+  EXPECT_NONFATAL_FAILURE({
+    MockA a;
+    a.DoA(0);
+  }, "Uninteresting mock function call");
+
+  // Out of bounds values are converted to kWarn
+  testing::GMOCK_FLAG(default_mock_behavior) = -1;
+  CaptureStdout();
+  {
+    MockA a;
+    a.DoA(0);
+  }
+  warning_output = GetCapturedStdout();
+  EXPECT_PRED_FORMAT2(IsSubstring, "GMOCK WARNING", warning_output);
+  EXPECT_PRED_FORMAT2(IsSubstring, "Uninteresting mock function call",
+                      warning_output);
+  testing::GMOCK_FLAG(default_mock_behavior) = 3;
+  CaptureStdout();
+  {
+    MockA a;
+    a.DoA(0);
+  }
+  warning_output = GetCapturedStdout();
+  EXPECT_PRED_FORMAT2(IsSubstring, "GMOCK WARNING", warning_output);
+  EXPECT_PRED_FORMAT2(IsSubstring, "Uninteresting mock function call",
+                      warning_output);
+
+  testing::GMOCK_FLAG(default_mock_behavior) = original_behavior;
 }
 
 #endif  // GTEST_HAS_STREAM_REDIRECTION
@@ -858,13 +933,13 @@ TEST(ExpectCallTest, TakesDefaultActionWhenWillListIsExhausted) {
                            // expectation has no action clause at all.
   EXPECT_EQ(1, b.DoB());
   EXPECT_EQ(2, b.DoB());
-  const String output1 = GetCapturedStdout();
+  const std::string output1 = GetCapturedStdout();
   EXPECT_STREQ("", output1.c_str());
 
   CaptureStdout();
   EXPECT_EQ(0, b.DoB());
   EXPECT_EQ(0, b.DoB());
-  const String output2 = GetCapturedStdout();
+  const std::string output2 = GetCapturedStdout();
   EXPECT_THAT(output2.c_str(),
               HasSubstr("Actions ran out in EXPECT_CALL(b, DoB())...\n"
                         "Called 3 times, but only 2 WillOnce()s are specified"
@@ -875,7 +950,7 @@ TEST(ExpectCallTest, TakesDefaultActionWhenWillListIsExhausted) {
                         " - returning default value."));
 }
 
-TEST(FunctionMockerTest, ReportsExpectCallLocationForExhausedActions) {
+TEST(FunctionMockerMessageTest, ReportsExpectCallLocationForExhausedActions) {
   MockB b;
   std::string expect_call_location = FormatFileLocation(__FILE__, __LINE__ + 1);
   EXPECT_CALL(b, DoB()).Times(AnyNumber()).WillOnce(Return(1));
@@ -884,16 +959,17 @@ TEST(FunctionMockerTest, ReportsExpectCallLocationForExhausedActions) {
 
   CaptureStdout();
   EXPECT_EQ(0, b.DoB());
-  const String output = GetCapturedStdout();
+  const std::string output = GetCapturedStdout();
   // The warning message should contain the call location.
   EXPECT_PRED_FORMAT2(IsSubstring, expect_call_location, output);
 }
 
-TEST(FunctionMockerTest, ReportsDefaultActionLocationOfUninterestingCalls) {
+TEST(FunctionMockerMessageTest,
+     ReportsDefaultActionLocationOfUninterestingCallsForNaggyMock) {
   std::string on_call_location;
   CaptureStdout();
   {
-    MockB b;
+    NaggyMock<MockB> b;
     on_call_location = FormatFileLocation(__FILE__, __LINE__ + 1);
     ON_CALL(b, DoB(_)).WillByDefault(Return(0));
     b.DoB(0);
@@ -1096,12 +1172,17 @@ TEST(UnexpectedCallTest, UnsatisifiedPrerequisites) {
   b.DoB(4);
 }
 
-TEST(UndefinedReturnValueTest, ReturnValueIsMandatory) {
+TEST(UndefinedReturnValueTest,
+     ReturnValueIsMandatoryWhenNotDefaultConstructible) {
   MockA a;
-  // TODO(wan@google.com): We should really verify the output message,
+  // FIXME: We should really verify the output message,
   // but we cannot yet due to that EXPECT_DEATH only captures stderr
   // while Google Mock logs to stdout.
-  EXPECT_DEATH_IF_SUPPORTED(a.ReturnResult(1), "");
+#if GTEST_HAS_EXCEPTIONS
+  EXPECT_ANY_THROW(a.ReturnNonDefaultConstructible());
+#else
+  EXPECT_DEATH_IF_SUPPORTED(a.ReturnNonDefaultConstructible(), "");
+#endif
 }
 
 // Tests that an excessive call (one whose arguments match the
@@ -1250,87 +1331,116 @@ TEST(SequenceTest, AnyOrderIsOkByDefault) {
 
 // Tests that the calls must be in strict order when a complete order
 // is specified.
-TEST(SequenceTest, CallsMustBeInStrictOrderWhenSaidSo) {
+TEST(SequenceTest, CallsMustBeInStrictOrderWhenSaidSo1) {
   MockA a;
+  ON_CALL(a, ReturnResult(_))
+      .WillByDefault(Return(Result()));
+
   Sequence s;
-
   EXPECT_CALL(a, ReturnResult(1))
-      .InSequence(s)
-      .WillOnce(Return(Result()));
-
+      .InSequence(s);
   EXPECT_CALL(a, ReturnResult(2))
-      .InSequence(s)
-      .WillOnce(Return(Result()));
-
+      .InSequence(s);
   EXPECT_CALL(a, ReturnResult(3))
-      .InSequence(s)
-      .WillOnce(Return(Result()));
-
-  EXPECT_DEATH_IF_SUPPORTED({
-    a.ReturnResult(1);
-    a.ReturnResult(3);
-    a.ReturnResult(2);
-  }, "");
-
-  EXPECT_DEATH_IF_SUPPORTED({
-    a.ReturnResult(2);
-    a.ReturnResult(1);
-    a.ReturnResult(3);
-  }, "");
+      .InSequence(s);
 
   a.ReturnResult(1);
+
+  // May only be called after a.ReturnResult(2).
+  EXPECT_NONFATAL_FAILURE(a.ReturnResult(3), "Unexpected mock function call");
+
   a.ReturnResult(2);
   a.ReturnResult(3);
 }
 
-// Tests specifying a DAG using multiple sequences.
-TEST(SequenceTest, CallsMustConformToSpecifiedDag) {
+// Tests that the calls must be in strict order when a complete order
+// is specified.
+TEST(SequenceTest, CallsMustBeInStrictOrderWhenSaidSo2) {
   MockA a;
-  MockB b;
-  Sequence x, y;
+  ON_CALL(a, ReturnResult(_))
+      .WillByDefault(Return(Result()));
 
+  Sequence s;
   EXPECT_CALL(a, ReturnResult(1))
-      .InSequence(x)
-      .WillOnce(Return(Result()));
-
-  EXPECT_CALL(b, DoB())
-      .Times(2)
-      .InSequence(y);
-
+      .InSequence(s);
   EXPECT_CALL(a, ReturnResult(2))
-      .InSequence(x, y)
-      .WillRepeatedly(Return(Result()));
+      .InSequence(s);
 
-  EXPECT_CALL(a, ReturnResult(3))
-      .InSequence(x)
-      .WillOnce(Return(Result()));
+  // May only be called after a.ReturnResult(1).
+  EXPECT_NONFATAL_FAILURE(a.ReturnResult(2), "Unexpected mock function call");
 
-  EXPECT_DEATH_IF_SUPPORTED({
-    a.ReturnResult(1);
-    b.DoB();
-    a.ReturnResult(2);
-  }, "");
-
-  EXPECT_DEATH_IF_SUPPORTED({
-    a.ReturnResult(2);
-  }, "");
-
-  EXPECT_DEATH_IF_SUPPORTED({
-    a.ReturnResult(3);
-  }, "");
-
-  EXPECT_DEATH_IF_SUPPORTED({
-    a.ReturnResult(1);
-    b.DoB();
-    b.DoB();
-    a.ReturnResult(3);
-    a.ReturnResult(2);
-  }, "");
-
-  b.DoB();
   a.ReturnResult(1);
-  b.DoB();
-  a.ReturnResult(3);
+  a.ReturnResult(2);
+}
+
+// Tests specifying a DAG using multiple sequences.
+class PartialOrderTest : public testing::Test {
+ protected:
+  PartialOrderTest() {
+    ON_CALL(a_, ReturnResult(_))
+        .WillByDefault(Return(Result()));
+
+    // Specifies this partial ordering:
+    //
+    // a.ReturnResult(1) ==>
+    //                       a.ReturnResult(2) * n  ==>  a.ReturnResult(3)
+    // b.DoB() * 2       ==>
+    Sequence x, y;
+    EXPECT_CALL(a_, ReturnResult(1))
+        .InSequence(x);
+    EXPECT_CALL(b_, DoB())
+        .Times(2)
+        .InSequence(y);
+    EXPECT_CALL(a_, ReturnResult(2))
+        .Times(AnyNumber())
+        .InSequence(x, y);
+    EXPECT_CALL(a_, ReturnResult(3))
+        .InSequence(x);
+  }
+
+  MockA a_;
+  MockB b_;
+};
+
+TEST_F(PartialOrderTest, CallsMustConformToSpecifiedDag1) {
+  a_.ReturnResult(1);
+  b_.DoB();
+
+  // May only be called after the second DoB().
+  EXPECT_NONFATAL_FAILURE(a_.ReturnResult(2), "Unexpected mock function call");
+
+  b_.DoB();
+  a_.ReturnResult(3);
+}
+
+TEST_F(PartialOrderTest, CallsMustConformToSpecifiedDag2) {
+  // May only be called after ReturnResult(1).
+  EXPECT_NONFATAL_FAILURE(a_.ReturnResult(2), "Unexpected mock function call");
+
+  a_.ReturnResult(1);
+  b_.DoB();
+  b_.DoB();
+  a_.ReturnResult(3);
+}
+
+TEST_F(PartialOrderTest, CallsMustConformToSpecifiedDag3) {
+  // May only be called last.
+  EXPECT_NONFATAL_FAILURE(a_.ReturnResult(3), "Unexpected mock function call");
+
+  a_.ReturnResult(1);
+  b_.DoB();
+  b_.DoB();
+  a_.ReturnResult(3);
+}
+
+TEST_F(PartialOrderTest, CallsMustConformToSpecifiedDag4) {
+  a_.ReturnResult(1);
+  b_.DoB();
+  b_.DoB();
+  a_.ReturnResult(3);
+
+  // May only be called before ReturnResult(3).
+  EXPECT_NONFATAL_FAILURE(a_.ReturnResult(2), "Unexpected mock function call");
 }
 
 TEST(SequenceTest, Retirement) {
@@ -1478,14 +1588,14 @@ TEST(ExpectationSetTest, SizeWorks) {
 
 TEST(ExpectationSetTest, IsEnumerable) {
   ExpectationSet es;
-  EXPECT_THAT(es.begin(), Eq(es.end()));
+  EXPECT_TRUE(es.begin() == es.end());
 
   es += Expectation();
   ExpectationSet::const_iterator it = es.begin();
-  EXPECT_THAT(it, Ne(es.end()));
+  EXPECT_TRUE(it != es.end());
   EXPECT_THAT(*it, Eq(Expectation()));
   ++it;
-  EXPECT_THAT(it, Eq(es.end()));
+  EXPECT_TRUE(it== es.end());
 }
 
 // Tests the .After() clause.
@@ -1520,71 +1630,112 @@ TEST(AfterTest, SucceedsWhenTotalOrderIsSatisfied) {
   a.DoA(2);
 }
 
-// Calls must be in strict order when specified so.
-TEST(AfterDeathTest, CallsMustBeInStrictOrderWhenSpecifiedSo) {
+// Calls must be in strict order when specified so using .After().
+TEST(AfterTest, CallsMustBeInStrictOrderWhenSpecifiedSo1) {
   MockA a;
   MockB b;
+
+  // Define ordering:
+  //   a.DoA(1) ==> b.DoB() ==> a.DoA(2)
+  Expectation e1 = EXPECT_CALL(a, DoA(1));
+  Expectation e2 = EXPECT_CALL(b, DoB())
+      .After(e1);
+  EXPECT_CALL(a, DoA(2))
+      .After(e2);
+
+  a.DoA(1);
+
+  // May only be called after DoB().
+  EXPECT_NONFATAL_FAILURE(a.DoA(2), "Unexpected mock function call");
+
+  b.DoB();
+  a.DoA(2);
+}
+
+// Calls must be in strict order when specified so using .After().
+TEST(AfterTest, CallsMustBeInStrictOrderWhenSpecifiedSo2) {
+  MockA a;
+  MockB b;
+
+  // Define ordering:
+  //   a.DoA(1) ==> b.DoB() * 2 ==> a.DoA(2)
   Expectation e1 = EXPECT_CALL(a, DoA(1));
   Expectation e2 = EXPECT_CALL(b, DoB())
       .Times(2)
       .After(e1);
-  EXPECT_CALL(a, ReturnResult(2))
-      .After(e2)
-      .WillOnce(Return(Result()));
+  EXPECT_CALL(a, DoA(2))
+      .After(e2);
 
   a.DoA(1);
-  // If a call to ReturnResult() violates the specified order, no
-  // matching expectation will be found, and thus the default action
-  // will be done.  Since the return type of ReturnResult() is not a
-  // built-in type, gmock won't know what to return and will thus
-  // abort the program.  Therefore a death test can tell us whether
-  // gmock catches the order violation correctly.
-  //
-  // gtest and gmock print messages to stdout, which isn't captured by
-  // death tests.  Therefore we have to match with an empty regular
-  // expression in all the EXPECT_DEATH()s.
-  EXPECT_DEATH_IF_SUPPORTED(a.ReturnResult(2), "");
+  b.DoB();
+
+  // May only be called after the second DoB().
+  EXPECT_NONFATAL_FAILURE(a.DoA(2), "Unexpected mock function call");
 
   b.DoB();
-  EXPECT_DEATH_IF_SUPPORTED(a.ReturnResult(2), "");
-
-  b.DoB();
-  a.ReturnResult(2);
+  a.DoA(2);
 }
 
 // Calls must satisfy the partial order when specified so.
-TEST(AfterDeathTest, CallsMustSatisfyPartialOrderWhenSpecifiedSo) {
+TEST(AfterTest, CallsMustSatisfyPartialOrderWhenSpecifiedSo) {
   MockA a;
+  ON_CALL(a, ReturnResult(_))
+      .WillByDefault(Return(Result()));
+
+  // Define ordering:
+  //   a.DoA(1) ==>
+  //   a.DoA(2) ==> a.ReturnResult(3)
   Expectation e = EXPECT_CALL(a, DoA(1));
   const ExpectationSet es = EXPECT_CALL(a, DoA(2));
   EXPECT_CALL(a, ReturnResult(3))
-      .After(e, es)
-      .WillOnce(Return(Result()));
+      .After(e, es);
 
-  EXPECT_DEATH_IF_SUPPORTED(a.ReturnResult(3), "");
+  // May only be called last.
+  EXPECT_NONFATAL_FAILURE(a.ReturnResult(3), "Unexpected mock function call");
 
   a.DoA(2);
-  EXPECT_DEATH_IF_SUPPORTED(a.ReturnResult(3), "");
-
   a.DoA(1);
   a.ReturnResult(3);
 }
 
+// Calls must satisfy the partial order when specified so.
+TEST(AfterTest, CallsMustSatisfyPartialOrderWhenSpecifiedSo2) {
+  MockA a;
+
+  // Define ordering:
+  //   a.DoA(1) ==>
+  //   a.DoA(2) ==> a.DoA(3)
+  Expectation e = EXPECT_CALL(a, DoA(1));
+  const ExpectationSet es = EXPECT_CALL(a, DoA(2));
+  EXPECT_CALL(a, DoA(3))
+      .After(e, es);
+
+  a.DoA(2);
+
+  // May only be called last.
+  EXPECT_NONFATAL_FAILURE(a.DoA(3), "Unexpected mock function call");
+
+  a.DoA(1);
+  a.DoA(3);
+}
+
 // .After() can be combined with .InSequence().
-TEST(AfterDeathTest, CanBeUsedWithInSequence) {
+TEST(AfterTest, CanBeUsedWithInSequence) {
   MockA a;
   Sequence s;
   Expectation e = EXPECT_CALL(a, DoA(1));
   EXPECT_CALL(a, DoA(2)).InSequence(s);
-  EXPECT_CALL(a, ReturnResult(3))
-      .InSequence(s).After(e)
-      .WillOnce(Return(Result()));
+  EXPECT_CALL(a, DoA(3))
+      .InSequence(s)
+      .After(e);
 
   a.DoA(1);
-  EXPECT_DEATH_IF_SUPPORTED(a.ReturnResult(3), "");
+
+  // May only be after DoA(2).
+  EXPECT_NONFATAL_FAILURE(a.DoA(3), "Unexpected mock function call");
 
   a.DoA(2);
-  a.ReturnResult(3);
+  a.DoA(3);
 }
 
 // .After() can be called multiple times.
@@ -1626,17 +1777,24 @@ TEST(AfterTest, AcceptsUpToFiveArguments) {
 // .After() allows input to contain duplicated Expectations.
 TEST(AfterTest, AcceptsDuplicatedInput) {
   MockA a;
+  ON_CALL(a, ReturnResult(_))
+      .WillByDefault(Return(Result()));
+
+  // Define ordering:
+  //   DoA(1) ==>
+  //   DoA(2) ==> ReturnResult(3)
   Expectation e1 = EXPECT_CALL(a, DoA(1));
   Expectation e2 = EXPECT_CALL(a, DoA(2));
   ExpectationSet es;
   es += e1;
   es += e2;
   EXPECT_CALL(a, ReturnResult(3))
-      .After(e1, e2, es, e1)
-      .WillOnce(Return(Result()));
+      .After(e1, e2, es, e1);
 
   a.DoA(1);
-  EXPECT_DEATH_IF_SUPPORTED(a.ReturnResult(3), "");
+
+  // May only be after DoA(2).
+  EXPECT_NONFATAL_FAILURE(a.ReturnResult(3), "Unexpected mock function call");
 
   a.DoA(2);
   a.ReturnResult(3);
@@ -1852,7 +2010,7 @@ class MockC {
  public:
   MockC() {}
 
-  MOCK_METHOD6(VoidMethod, void(bool cond, int n, string s, void* p,
+  MOCK_METHOD6(VoidMethod, void(bool cond, int n, std::string s, void* p,
                                 const Printable& x, Unprintable y));
   MOCK_METHOD0(NonVoidMethod, int());  // NOLINT
 
@@ -1862,32 +2020,43 @@ class MockC {
 
 class VerboseFlagPreservingFixture : public testing::Test {
  protected:
-  // The code needs to work when both ::string and ::std::string are defined
-  // and the flag is implemented as a testing::internal::String.  In this
-  // case, without the call to c_str(), the compiler will complain that it
-  // cannot figure out what overload of string constructor to use.
-  // TODO(vladl@google.com): Use internal::string instead of String for
-  // string flags in Google Test.
   VerboseFlagPreservingFixture()
-      : saved_verbose_flag_(GMOCK_FLAG(verbose).c_str()) {}
+      : saved_verbose_flag_(GMOCK_FLAG(verbose)) {}
 
   ~VerboseFlagPreservingFixture() { GMOCK_FLAG(verbose) = saved_verbose_flag_; }
 
  private:
-  const string saved_verbose_flag_;
+  const std::string saved_verbose_flag_;
 
   GTEST_DISALLOW_COPY_AND_ASSIGN_(VerboseFlagPreservingFixture);
 };
 
 #if GTEST_HAS_STREAM_REDIRECTION
 
-// Tests that an uninteresting mock function call generates a warning
-// containing the stack trace.
-TEST(FunctionCallMessageTest, UninterestingCallGeneratesFyiWithStackTrace) {
-  MockC c;
+// Tests that an uninteresting mock function call on a naggy mock
+// generates a warning without the stack trace when
+// --gmock_verbose=warning is specified.
+TEST(FunctionCallMessageTest,
+     UninterestingCallOnNaggyMockGeneratesNoStackTraceWhenVerboseWarning) {
+  GMOCK_FLAG(verbose) = kWarningVerbosity;
+  NaggyMock<MockC> c;
   CaptureStdout();
   c.VoidMethod(false, 5, "Hi", NULL, Printable(), Unprintable());
-  const String output = GetCapturedStdout();
+  const std::string output = GetCapturedStdout();
+  EXPECT_PRED_FORMAT2(IsSubstring, "GMOCK WARNING", output);
+  EXPECT_PRED_FORMAT2(IsNotSubstring, "Stack trace:", output);
+}
+
+// Tests that an uninteresting mock function call on a naggy mock
+// generates a warning containing the stack trace when
+// --gmock_verbose=info is specified.
+TEST(FunctionCallMessageTest,
+     UninterestingCallOnNaggyMockGeneratesFyiWithStackTraceWhenVerboseInfo) {
+  GMOCK_FLAG(verbose) = kInfoVerbosity;
+  NaggyMock<MockC> c;
+  CaptureStdout();
+  c.VoidMethod(false, 5, "Hi", NULL, Printable(), Unprintable());
+  const std::string output = GetCapturedStdout();
   EXPECT_PRED_FORMAT2(IsSubstring, "GMOCK WARNING", output);
   EXPECT_PRED_FORMAT2(IsSubstring, "Stack trace:", output);
 
@@ -1904,20 +2073,21 @@ TEST(FunctionCallMessageTest, UninterestingCallGeneratesFyiWithStackTrace) {
   // stack trace.
   CaptureStdout();
   c.NonVoidMethod();
-  const String output2 = GetCapturedStdout();
+  const std::string output2 = GetCapturedStdout();
   EXPECT_PRED_FORMAT2(IsSubstring, "NonVoidMethod(", output2);
 
 # endif  // NDEBUG
 }
 
-// Tests that an uninteresting mock function call causes the function
-// arguments and return value to be printed.
-TEST(FunctionCallMessageTest, UninterestingCallPrintsArgumentsAndReturnValue) {
+// Tests that an uninteresting mock function call on a naggy mock
+// causes the function arguments and return value to be printed.
+TEST(FunctionCallMessageTest,
+     UninterestingCallOnNaggyMockPrintsArgumentsAndReturnValue) {
   // A non-void mock function.
-  MockB b;
+  NaggyMock<MockB> b;
   CaptureStdout();
   b.DoB();
-  const String output1 = GetCapturedStdout();
+  const std::string output1 = GetCapturedStdout();
   EXPECT_PRED_FORMAT2(
       IsSubstring,
       "Uninteresting mock function call - returning default value.\n"
@@ -1926,10 +2096,10 @@ TEST(FunctionCallMessageTest, UninterestingCallPrintsArgumentsAndReturnValue) {
   // Makes sure the return value is printed.
 
   // A void mock function.
-  MockC c;
+  NaggyMock<MockC> c;
   CaptureStdout();
   c.VoidMethod(false, 5, "Hi", NULL, Printable(), Unprintable());
-  const String output2 = GetCapturedStdout();
+  const std::string output2 = GetCapturedStdout();
   EXPECT_THAT(output2.c_str(),
               ContainsRegex(
                   "Uninteresting mock function call - returning directly\\.\n"
@@ -1947,9 +2117,9 @@ class GMockVerboseFlagTest : public VerboseFlagPreservingFixture {
   // should_print is true, the output should match the given regex and
   // contain the given function name in the stack trace.  When it's
   // false, the output should be empty.)
-  void VerifyOutput(const String& output, bool should_print,
-                    const string& expected_substring,
-                    const string& function_name) {
+  void VerifyOutput(const std::string& output, bool should_print,
+                    const std::string& expected_substring,
+                    const std::string& function_name) {
     if (should_print) {
       EXPECT_THAT(output.c_str(), HasSubstr(expected_substring));
 # ifndef NDEBUG
@@ -1996,9 +2166,17 @@ class GMockVerboseFlagTest : public VerboseFlagPreservingFixture {
         "Binary");
   }
 
-  // Tests how the flag affects uninteresting calls.
-  void TestUninterestingCall(bool should_print) {
-    MockA a;
+  // Tests how the flag affects uninteresting calls on a naggy mock.
+  void TestUninterestingCallOnNaggyMock(bool should_print) {
+    NaggyMock<MockA> a;
+    const std::string note =
+        "NOTE: You can safely ignore the above warning unless this "
+        "call should not happen.  Do not suppress it by blindly adding "
+        "an EXPECT_CALL() if you don't mean to enforce the call.  "
+        "See "
+        "https://github.com/google/googletest/blob/master/googlemock/docs/"
+        "CookBook.md#"
+        "knowing-when-to-expect for details.";
 
     // A void-returning function.
     CaptureStdout();
@@ -2008,8 +2186,8 @@ class GMockVerboseFlagTest : public VerboseFlagPreservingFixture {
         should_print,
         "\nGMOCK WARNING:\n"
         "Uninteresting mock function call - returning directly.\n"
-        "    Function call: DoA(5)\n"
-        "Stack trace:\n",
+        "    Function call: DoA(5)\n" +
+        note,
         "DoA");
 
     // A non-void-returning function.
@@ -2021,8 +2199,8 @@ class GMockVerboseFlagTest : public VerboseFlagPreservingFixture {
         "\nGMOCK WARNING:\n"
         "Uninteresting mock function call - returning default value.\n"
         "    Function call: Binary(2, 1)\n"
-        "          Returns: false\n"
-        "Stack trace:\n",
+        "          Returns: false\n" +
+        note,
         "Binary");
   }
 };
@@ -2032,7 +2210,7 @@ class GMockVerboseFlagTest : public VerboseFlagPreservingFixture {
 TEST_F(GMockVerboseFlagTest, Info) {
   GMOCK_FLAG(verbose) = kInfoVerbosity;
   TestExpectedCall(true);
-  TestUninterestingCall(true);
+  TestUninterestingCallOnNaggyMock(true);
 }
 
 // Tests that --gmock_verbose=warning causes uninteresting calls to be
@@ -2040,7 +2218,7 @@ TEST_F(GMockVerboseFlagTest, Info) {
 TEST_F(GMockVerboseFlagTest, Warning) {
   GMOCK_FLAG(verbose) = kWarningVerbosity;
   TestExpectedCall(false);
-  TestUninterestingCall(true);
+  TestUninterestingCallOnNaggyMock(true);
 }
 
 // Tests that --gmock_verbose=warning causes neither expected nor
@@ -2048,7 +2226,7 @@ TEST_F(GMockVerboseFlagTest, Warning) {
 TEST_F(GMockVerboseFlagTest, Error) {
   GMOCK_FLAG(verbose) = kErrorVerbosity;
   TestExpectedCall(false);
-  TestUninterestingCall(false);
+  TestUninterestingCallOnNaggyMock(false);
 }
 
 // Tests that --gmock_verbose=SOME_INVALID_VALUE has the same effect
@@ -2056,7 +2234,7 @@ TEST_F(GMockVerboseFlagTest, Error) {
 TEST_F(GMockVerboseFlagTest, InvalidFlagIsTreatedAsWarning) {
   GMOCK_FLAG(verbose) = "invalid";  // Treated as "warning".
   TestExpectedCall(false);
-  TestUninterestingCall(true);
+  TestUninterestingCallOnNaggyMock(true);
 }
 
 #endif  // GTEST_HAS_STREAM_REDIRECTION
@@ -2439,6 +2617,46 @@ TEST(VerifyAndClearTest, DoesNotAffectOtherMockObjects) {
   EXPECT_EQ(2, b1.DoB(0));
 }
 
+TEST(VerifyAndClearTest,
+     DestroyingChainedMocksDoesNotDeadlockThroughExpectations) {
+  linked_ptr<MockA> a(new MockA);
+  ReferenceHoldingMock test_mock;
+
+  // EXPECT_CALL stores a reference to a inside test_mock.
+  EXPECT_CALL(test_mock, AcceptReference(_))
+      .WillRepeatedly(SetArgPointee<0>(a));
+
+  // Throw away the reference to the mock that we have in a. After this, the
+  // only reference to it is stored by test_mock.
+  a.reset();
+
+  // When test_mock goes out of scope, it destroys the last remaining reference
+  // to the mock object originally pointed to by a. This will cause the MockA
+  // destructor to be called from inside the ReferenceHoldingMock destructor.
+  // The state of all mocks is protected by a single global lock, but there
+  // should be no deadlock.
+}
+
+TEST(VerifyAndClearTest,
+     DestroyingChainedMocksDoesNotDeadlockThroughDefaultAction) {
+  linked_ptr<MockA> a(new MockA);
+  ReferenceHoldingMock test_mock;
+
+  // ON_CALL stores a reference to a inside test_mock.
+  ON_CALL(test_mock, AcceptReference(_))
+      .WillByDefault(SetArgPointee<0>(a));
+
+  // Throw away the reference to the mock that we have in a. After this, the
+  // only reference to it is stored by test_mock.
+  a.reset();
+
+  // When test_mock goes out of scope, it destroys the last remaining reference
+  // to the mock object originally pointed to by a. This will cause the MockA
+  // destructor to be called from inside the ReferenceHoldingMock destructor.
+  // The state of all mocks is protected by a single global lock, but there
+  // should be no deadlock.
+}
+
 // Tests that a mock function's action can call a mock function
 // (either the same function or a different one) either as an explicit
 // action or as a default action without causing a dead lock.  It
@@ -2463,9 +2681,78 @@ TEST(SynchronizationTest, CanCallMockMethodInAction) {
   // EXPECT_CALL() did not specify an action.
 }
 
+TEST(ParameterlessExpectationsTest, CanSetExpectationsWithoutMatchers) {
+  MockA a;
+  int do_a_arg0 = 0;
+  ON_CALL(a, DoA).WillByDefault(SaveArg<0>(&do_a_arg0));
+  int do_a_47_arg0 = 0;
+  ON_CALL(a, DoA(47)).WillByDefault(SaveArg<0>(&do_a_47_arg0));
+
+  a.DoA(17);
+  EXPECT_THAT(do_a_arg0, 17);
+  EXPECT_THAT(do_a_47_arg0, 0);
+  a.DoA(47);
+  EXPECT_THAT(do_a_arg0, 17);
+  EXPECT_THAT(do_a_47_arg0, 47);
+
+  ON_CALL(a, Binary).WillByDefault(Return(true));
+  ON_CALL(a, Binary(_, 14)).WillByDefault(Return(false));
+  EXPECT_THAT(a.Binary(14, 17), true);
+  EXPECT_THAT(a.Binary(17, 14), false);
+}
+
+TEST(ParameterlessExpectationsTest, CanSetExpectationsForOverloadedMethods) {
+  MockB b;
+  ON_CALL(b, DoB()).WillByDefault(Return(9));
+  ON_CALL(b, DoB(5)).WillByDefault(Return(11));
+
+  EXPECT_THAT(b.DoB(), 9);
+  EXPECT_THAT(b.DoB(1), 0);  // default value
+  EXPECT_THAT(b.DoB(5), 11);
+}
+
+struct MockWithConstMethods {
+ public:
+  MOCK_CONST_METHOD1(Foo, int(int));
+  MOCK_CONST_METHOD2(Bar, int(int, const char*));
+};
+
+TEST(ParameterlessExpectationsTest, CanSetExpectationsForConstMethods) {
+  MockWithConstMethods mock;
+  ON_CALL(mock, Foo).WillByDefault(Return(7));
+  ON_CALL(mock, Bar).WillByDefault(Return(33));
+
+  EXPECT_THAT(mock.Foo(17), 7);
+  EXPECT_THAT(mock.Bar(27, "purple"), 33);
+}
+
+class MockConstOverload {
+ public:
+  MOCK_METHOD1(Overloaded, int(int));
+  MOCK_CONST_METHOD1(Overloaded, int(int));
+};
+
+TEST(ParameterlessExpectationsTest,
+     CanSetExpectationsForConstOverloadedMethods) {
+  MockConstOverload mock;
+  ON_CALL(mock, Overloaded(_)).WillByDefault(Return(7));
+  ON_CALL(mock, Overloaded(5)).WillByDefault(Return(9));
+  ON_CALL(Const(mock), Overloaded(5)).WillByDefault(Return(11));
+  ON_CALL(Const(mock), Overloaded(7)).WillByDefault(Return(13));
+
+  EXPECT_THAT(mock.Overloaded(1), 7);
+  EXPECT_THAT(mock.Overloaded(5), 9);
+  EXPECT_THAT(mock.Overloaded(7), 7);
+
+  const MockConstOverload& const_mock = mock;
+  EXPECT_THAT(const_mock.Overloaded(1), 0);
+  EXPECT_THAT(const_mock.Overloaded(5), 11);
+  EXPECT_THAT(const_mock.Overloaded(7), 13);
+}
+
 }  // namespace
 
-// Allows the user to define his own main and then invoke gmock_main
+// Allows the user to define their own main and then invoke gmock_main
 // from it. This might be necessary on some platforms which require
 // specific setup and teardown.
 #if GMOCK_RENAME_MAIN
@@ -2474,7 +2761,6 @@ int gmock_main(int argc, char **argv) {
 int main(int argc, char **argv) {
 #endif  // GMOCK_RENAME_MAIN
   testing::InitGoogleMock(&argc, argv);
-
   // Ensures that the tests pass no matter what value of
   // --gmock_catch_leaked_mocks and --gmock_verbose the user specifies.
   testing::GMOCK_FLAG(catch_leaked_mocks) = true;

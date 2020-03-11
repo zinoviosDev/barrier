@@ -70,6 +70,7 @@ FUNCTION_DTOR = 0x10
 FUNCTION_ATTRIBUTE = 0x20
 FUNCTION_UNKNOWN_ANNOTATION = 0x40
 FUNCTION_THROW = 0x80
+FUNCTION_OVERRIDE = 0x100
 
 """
 These are currently unused.  Should really handle these properly at some point.
@@ -337,7 +338,7 @@ class Class(_GenericDeclaration):
         # TODO(nnorwitz): handle namespaces, etc.
         if self.bases:
             for token_list in self.bases:
-                # TODO(nnorwitz): bases are tokens, do name comparision.
+                # TODO(nnorwitz): bases are tokens, do name comparison.
                 for token in token_list:
                     if token.name == node.name:
                         return True
@@ -380,7 +381,7 @@ class Function(_GenericDeclaration):
 
     def Requires(self, node):
         if self.parameters:
-            # TODO(nnorwitz): parameters are tokens, do name comparision.
+            # TODO(nnorwitz): parameters are tokens, do name comparison.
             for p in self.parameters:
                 if p.name == node.name:
                     return True
@@ -495,9 +496,10 @@ class TypeConverter(object):
                 else:
                     names.append(t.name)
             name = ''.join(names)
-            result.append(Type(name_tokens[0].start, name_tokens[-1].end,
-                               name, templated_types, modifiers,
-                               reference, pointer, array))
+            if name_tokens:
+                result.append(Type(name_tokens[0].start, name_tokens[-1].end,
+                                   name, templated_types, modifiers,
+                                   reference, pointer, array))
             del name_tokens[:]
 
         i = 0
@@ -597,10 +599,9 @@ class TypeConverter(object):
         first_token = None
         default = []
 
-        def AddParameter():
+        def AddParameter(end):
             if default:
                 del default[0]  # Remove flag.
-            end = type_modifiers[-1].end
             parts = self.DeclarationToParts(type_modifiers, True)
             (name, type_name, templated_types, modifiers,
              unused_default, unused_other_tokens) = parts
@@ -624,7 +625,7 @@ class TypeConverter(object):
                 continue
 
             if s.name == ',':
-                AddParameter()
+                AddParameter(s.start)
                 name = type_name = ''
                 type_modifiers = []
                 pointer = reference = array = False
@@ -645,7 +646,7 @@ class TypeConverter(object):
                 default.append(s)
             else:
                 type_modifiers.append(s)
-        AddParameter()
+        AddParameter(tokens[-1].end)
         return result
 
     def CreateReturnType(self, return_type_seq):
@@ -857,7 +858,7 @@ class AstBuilder(object):
             last_token = self._GetNextToken()
         return tokens, last_token
 
-    # TODO(nnorwitz): remove _IgnoreUpTo() it shouldn't be necesary.
+    # TODO(nnorwitz): remove _IgnoreUpTo() it shouldn't be necessary.
     def _IgnoreUpTo(self, token_type, token):
         unused_tokens = self._GetTokensUpTo(token_type, token)
 
@@ -1027,6 +1028,8 @@ class AstBuilder(object):
                 # Consume everything between the (parens).
                 unused_tokens = list(self._GetMatchingChar('(', ')'))
                 token = self._GetNextToken()
+            elif modifier_token.name == 'override':
+                modifiers |= FUNCTION_OVERRIDE
             elif modifier_token.name == modifier_token.name.upper():
                 # HACK(nnorwitz):  assume that all upper-case names
                 # are some macro we aren't expanding.
@@ -1079,10 +1082,17 @@ class AstBuilder(object):
             body = None
             if token.name == '=':
                 token = self._GetNextToken()
-                assert token.token_type == tokenize.CONSTANT, token
-                assert token.name == '0', token
-                modifiers |= FUNCTION_PURE_VIRTUAL
-                token = self._GetNextToken()
+
+                if token.name == 'default' or token.name == 'delete':
+                    # Ignore explicitly defaulted and deleted special members
+                    # in C++11.
+                    token = self._GetNextToken()
+                else:
+                    # Handle pure-virtual declarations.
+                    assert token.token_type == tokenize.CONSTANT, token
+                    assert token.name == '0', token
+                    modifiers |= FUNCTION_PURE_VIRTUAL
+                    token = self._GetNextToken()
 
             if token.name == '[':
                 # TODO(nnorwitz): store tokens and improve parsing.
@@ -1254,6 +1264,9 @@ class AstBuilder(object):
         return self._GetNestedType(Union)
 
     def handle_enum(self):
+        token = self._GetNextToken()
+        if not (token.token_type == tokenize.NAME and token.name == 'class'):
+            self._AddBackToken(token)
         return self._GetNestedType(Enum)
 
     def handle_auto(self):
@@ -1285,7 +1298,7 @@ class AstBuilder(object):
         if token2.token_type == tokenize.SYNTAX and token2.name == '~':
             return self.GetMethod(FUNCTION_VIRTUAL + FUNCTION_DTOR, None)
         assert token.token_type == tokenize.NAME or token.name == '::', token
-        return_type_and_name = self._GetTokensUpTo(tokenize.SYNTAX, '(')
+        return_type_and_name = self._GetTokensUpTo(tokenize.SYNTAX, '(')  # )
         return_type_and_name.insert(0, token)
         if token2 is not token:
             return_type_and_name.insert(1, token2)
@@ -1546,7 +1559,7 @@ class AstBuilder(object):
             self._AddBackToken(token)
 
         return class_type(class_token.start, class_token.end, class_name,
-                          bases, None, body, self.namespace_stack)
+                          bases, templated_types, body, self.namespace_stack)
 
     def handle_namespace(self):
         token = self._GetNextToken()

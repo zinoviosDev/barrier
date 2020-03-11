@@ -26,8 +26,7 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// Author: wan@google.com (Zhanyong Wan)
+
 
 // Google Mock - a framework for writing C++ mock classes.
 //
@@ -47,10 +46,10 @@ namespace gmock_more_actions_test {
 
 using ::std::plus;
 using ::std::string;
-using ::std::tr1::get;
-using ::std::tr1::make_tuple;
-using ::std::tr1::tuple;
-using ::std::tr1::tuple_element;
+using testing::get;
+using testing::make_tuple;
+using testing::tuple;
+using testing::tuple_element;
 using testing::_;
 using testing::Action;
 using testing::ActionInterface;
@@ -94,12 +93,12 @@ const char* Plus1(const char* s) { return s + 1; }
 
 void VoidUnary(int /* n */) { g_done = true; }
 
-bool ByConstRef(const string& s) { return s == "Hi"; }
+bool ByConstRef(const std::string& s) { return s == "Hi"; }
 
 const double g_double = 0;
 bool ReferencesGlobalDouble(const double& x) { return &x == &g_double; }
 
-string ByNonConstRef(string& s) { return s += "+"; }  // NOLINT
+std::string ByNonConstRef(std::string& s) { return s += "+"; }  // NOLINT
 
 struct UnaryFunctor {
   int operator()(bool x) { return x ? 1 : -1; }
@@ -119,9 +118,9 @@ int SumOfFirst2(int a, int b, Unused, Unused) { return a + b; }
 
 void VoidFunctionWithFourArguments(char, int, float, double) { g_done = true; }
 
-string Concat4(const char* s1, const char* s2, const char* s3,
-               const char* s4) {
-  return string(s1) + s2 + s3 + s4;
+std::string Concat4(const char* s1, const char* s2, const char* s3,
+                    const char* s4) {
+  return std::string(s1) + s2 + s3 + s4;
 }
 
 int SumOf5(int a, int b, int c, int d, int e) { return a + b + c + d + e; }
@@ -132,9 +131,9 @@ struct SumOf5Functor {
   }
 };
 
-string Concat5(const char* s1, const char* s2, const char* s3,
-               const char* s4, const char* s5) {
-  return string(s1) + s2 + s3 + s4 + s5;
+std::string Concat5(const char* s1, const char* s2, const char* s3,
+                    const char* s4, const char* s5) {
+  return std::string(s1) + s2 + s3 + s4 + s5;
 }
 
 int SumOf6(int a, int b, int c, int d, int e, int f) {
@@ -147,34 +146,34 @@ struct SumOf6Functor {
   }
 };
 
-string Concat6(const char* s1, const char* s2, const char* s3,
-               const char* s4, const char* s5, const char* s6) {
-  return string(s1) + s2 + s3 + s4 + s5 + s6;
+std::string Concat6(const char* s1, const char* s2, const char* s3,
+                    const char* s4, const char* s5, const char* s6) {
+  return std::string(s1) + s2 + s3 + s4 + s5 + s6;
 }
 
-string Concat7(const char* s1, const char* s2, const char* s3,
-               const char* s4, const char* s5, const char* s6,
-               const char* s7) {
-  return string(s1) + s2 + s3 + s4 + s5 + s6 + s7;
+std::string Concat7(const char* s1, const char* s2, const char* s3,
+                    const char* s4, const char* s5, const char* s6,
+                    const char* s7) {
+  return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7;
 }
 
-string Concat8(const char* s1, const char* s2, const char* s3,
-               const char* s4, const char* s5, const char* s6,
-               const char* s7, const char* s8) {
-  return string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8;
+std::string Concat8(const char* s1, const char* s2, const char* s3,
+                    const char* s4, const char* s5, const char* s6,
+                    const char* s7, const char* s8) {
+  return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8;
 }
 
-string Concat9(const char* s1, const char* s2, const char* s3,
-               const char* s4, const char* s5, const char* s6,
-               const char* s7, const char* s8, const char* s9) {
-  return string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9;
+std::string Concat9(const char* s1, const char* s2, const char* s3,
+                    const char* s4, const char* s5, const char* s6,
+                    const char* s7, const char* s8, const char* s9) {
+  return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9;
 }
 
-string Concat10(const char* s1, const char* s2, const char* s3,
-                const char* s4, const char* s5, const char* s6,
-                const char* s7, const char* s8, const char* s9,
-                const char* s10) {
-  return string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10;
+std::string Concat10(const char* s1, const char* s2, const char* s3,
+                     const char* s4, const char* s5, const char* s6,
+                     const char* s7, const char* s8, const char* s9,
+                     const char* s10) {
+  return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10;
 }
 
 class Foo {
@@ -185,7 +184,7 @@ class Foo {
 
   short Unary(long x) { return static_cast<short>(value_ + x); }  // NOLINT
 
-  string Binary(const string& str, char c) const { return str + c; }
+  std::string Binary(const std::string& str, char c) const { return str + c; }
 
   int Ternary(int x, bool y, char z) { return value_ + x + y*z; }
 
@@ -201,30 +200,31 @@ class Foo {
     return a + b + c + d + e + f;
   }
 
-  string Concat7(const char* s1, const char* s2, const char* s3,
-                 const char* s4, const char* s5, const char* s6,
-                 const char* s7) {
-    return string(s1) + s2 + s3 + s4 + s5 + s6 + s7;
+  std::string Concat7(const char* s1, const char* s2, const char* s3,
+                      const char* s4, const char* s5, const char* s6,
+                      const char* s7) {
+    return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7;
   }
 
-  string Concat8(const char* s1, const char* s2, const char* s3,
-                 const char* s4, const char* s5, const char* s6,
-                 const char* s7, const char* s8) {
-    return string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8;
+  std::string Concat8(const char* s1, const char* s2, const char* s3,
+                      const char* s4, const char* s5, const char* s6,
+                      const char* s7, const char* s8) {
+    return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8;
   }
 
-  string Concat9(const char* s1, const char* s2, const char* s3,
-                 const char* s4, const char* s5, const char* s6,
-                 const char* s7, const char* s8, const char* s9) {
-    return string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9;
+  std::string Concat9(const char* s1, const char* s2, const char* s3,
+                      const char* s4, const char* s5, const char* s6,
+                      const char* s7, const char* s8, const char* s9) {
+    return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9;
   }
 
-  string Concat10(const char* s1, const char* s2, const char* s3,
-                  const char* s4, const char* s5, const char* s6,
-                  const char* s7, const char* s8, const char* s9,
-                  const char* s10) {
-    return string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10;
+  std::string Concat10(const char* s1, const char* s2, const char* s3,
+                       const char* s4, const char* s5, const char* s6,
+                       const char* s7, const char* s8, const char* s9,
+                       const char* s10) {
+    return std::string(s1) + s2 + s3 + s4 + s5 + s6 + s7 + s8 + s9 + s10;
   }
+
  private:
   int value_;
 };
@@ -279,9 +279,9 @@ inline const char* CharPtr(const char* s) { return s; }
 
 // Tests using Invoke() with a 7-argument function.
 TEST(InvokeTest, FunctionThatTakes7Arguments) {
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*)> a =
-      Invoke(Concat7);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*)>
+      a = Invoke(Concat7);
   EXPECT_EQ("1234567",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -290,9 +290,9 @@ TEST(InvokeTest, FunctionThatTakes7Arguments) {
 
 // Tests using Invoke() with a 8-argument function.
 TEST(InvokeTest, FunctionThatTakes8Arguments) {
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*, const char*)> a =
-      Invoke(Concat8);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*, const char*)>
+      a = Invoke(Concat8);
   EXPECT_EQ("12345678",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -301,9 +301,10 @@ TEST(InvokeTest, FunctionThatTakes8Arguments) {
 
 // Tests using Invoke() with a 9-argument function.
 TEST(InvokeTest, FunctionThatTakes9Arguments) {
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*, const char*,
-                const char*)> a = Invoke(Concat9);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*, const char*,
+                     const char*)>
+      a = Invoke(Concat9);
   EXPECT_EQ("123456789",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -312,9 +313,10 @@ TEST(InvokeTest, FunctionThatTakes9Arguments) {
 
 // Tests using Invoke() with a 10-argument function.
 TEST(InvokeTest, FunctionThatTakes10Arguments) {
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*, const char*,
-                const char*, const char*)> a = Invoke(Concat10);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*, const char*,
+                     const char*, const char*)>
+      a = Invoke(Concat10);
   EXPECT_EQ("1234567890",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -324,9 +326,10 @@ TEST(InvokeTest, FunctionThatTakes10Arguments) {
 
 // Tests using Invoke() with functions with parameters declared as Unused.
 TEST(InvokeTest, FunctionWithUnusedParameters) {
-  Action<int(int, int, double, const string&)> a1 =
-      Invoke(SumOfFirst2);
-  EXPECT_EQ(12, a1.Perform(make_tuple(10, 2, 5.6, CharPtr("hi"))));
+  Action<int(int, int, double, const std::string&)> a1 = Invoke(SumOfFirst2);
+  tuple<int, int, double, std::string> dummy =
+      make_tuple(10, 2, 5.6, std::string("hi"));
+  EXPECT_EQ(12, a1.Perform(dummy));
 
   Action<int(int, int, bool, int*)> a2 =
       Invoke(SumOfFirst2);
@@ -336,8 +339,7 @@ TEST(InvokeTest, FunctionWithUnusedParameters) {
 // Tests using Invoke() with methods with parameters declared as Unused.
 TEST(InvokeTest, MethodWithUnusedParameters) {
   Foo foo;
-  Action<int(string, bool, int, int)> a1 =
-      Invoke(&foo, &Foo::SumOfLast2);
+  Action<int(std::string, bool, int, int)> a1 = Invoke(&foo, &Foo::SumOfLast2);
   EXPECT_EQ(12, a1.Perform(make_tuple(CharPtr("hi"), true, 10, 2)));
 
   Action<int(char, double, int, int)> a2 =
@@ -376,9 +378,10 @@ TEST(InvokeMethodTest, Unary) {
 // Tests using Invoke() with a binary method.
 TEST(InvokeMethodTest, Binary) {
   Foo foo;
-  Action<string(const string&, char)> a = Invoke(&foo, &Foo::Binary);
-  string s("Hell");
-  EXPECT_EQ("Hello", a.Perform(make_tuple(s, 'o')));
+  Action<std::string(const std::string&, char)> a = Invoke(&foo, &Foo::Binary);
+  std::string s("Hell");
+  tuple<std::string, char> dummy = make_tuple(s, 'o');
+  EXPECT_EQ("Hello", a.Perform(dummy));
 }
 
 // Tests using Invoke() with a ternary method.
@@ -413,9 +416,9 @@ TEST(InvokeMethodTest, MethodThatTakes6Arguments) {
 // Tests using Invoke() with a 7-argument method.
 TEST(InvokeMethodTest, MethodThatTakes7Arguments) {
   Foo foo;
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*)> a =
-      Invoke(&foo, &Foo::Concat7);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*)>
+      a = Invoke(&foo, &Foo::Concat7);
   EXPECT_EQ("1234567",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -425,9 +428,9 @@ TEST(InvokeMethodTest, MethodThatTakes7Arguments) {
 // Tests using Invoke() with a 8-argument method.
 TEST(InvokeMethodTest, MethodThatTakes8Arguments) {
   Foo foo;
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*, const char*)> a =
-      Invoke(&foo, &Foo::Concat8);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*, const char*)>
+      a = Invoke(&foo, &Foo::Concat8);
   EXPECT_EQ("12345678",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -437,9 +440,10 @@ TEST(InvokeMethodTest, MethodThatTakes8Arguments) {
 // Tests using Invoke() with a 9-argument method.
 TEST(InvokeMethodTest, MethodThatTakes9Arguments) {
   Foo foo;
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*, const char*,
-                const char*)> a = Invoke(&foo, &Foo::Concat9);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*, const char*,
+                     const char*)>
+      a = Invoke(&foo, &Foo::Concat9);
   EXPECT_EQ("123456789",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -449,9 +453,10 @@ TEST(InvokeMethodTest, MethodThatTakes9Arguments) {
 // Tests using Invoke() with a 10-argument method.
 TEST(InvokeMethodTest, MethodThatTakes10Arguments) {
   Foo foo;
-  Action<string(const char*, const char*, const char*, const char*,
-                const char*, const char*, const char*, const char*,
-                const char*, const char*)> a = Invoke(&foo, &Foo::Concat10);
+  Action<std::string(const char*, const char*, const char*, const char*,
+                     const char*, const char*, const char*, const char*,
+                     const char*, const char*)>
+      a = Invoke(&foo, &Foo::Concat10);
   EXPECT_EQ("1234567890",
             a.Perform(make_tuple(CharPtr("1"), CharPtr("2"), CharPtr("3"),
                                  CharPtr("4"), CharPtr("5"), CharPtr("6"),
@@ -491,8 +496,8 @@ TEST(ReturnArgActionTest, WorksForMultiArgBoolArg0) {
 }
 
 TEST(ReturnArgActionTest, WorksForMultiArgStringArg2) {
-  const Action<string(int, int, string, int)> a = ReturnArg<2>();
-  EXPECT_EQ("seven", a.Perform(make_tuple(5, 6, string("seven"), 8)));
+  const Action<std::string(int, int, std::string, int)> a = ReturnArg<2>();
+  EXPECT_EQ("seven", a.Perform(make_tuple(5, 6, std::string("seven"), 8)));
 }
 
 TEST(SaveArgActionTest, WorksForSameType) {
@@ -667,17 +672,17 @@ TEST(SetArrayArgumentTest, SetsTheNthArrayWithEmptyRange) {
 // Tests SetArrayArgument<N>(first, last) where *first is convertible
 // (but not equal) to the argument type.
 TEST(SetArrayArgumentTest, SetsTheNthArrayWithConvertibleType) {
-  typedef void MyFunction(bool, char*);
-  int codes[] = { 97, 98, 99 };
-  Action<MyFunction> a = SetArrayArgument<1>(codes, codes + 3);
+  typedef void MyFunction(bool, int*);
+  char chars[] = { 97, 98, 99 };
+  Action<MyFunction> a = SetArrayArgument<1>(chars, chars + 3);
 
-  char ch[4] = {};
-  char* pch = ch;
-  a.Perform(make_tuple(true, pch));
-  EXPECT_EQ('a', ch[0]);
-  EXPECT_EQ('b', ch[1]);
-  EXPECT_EQ('c', ch[2]);
-  EXPECT_EQ('\0', ch[3]);
+  int codes[4] = { 111, 222, 333, 444 };
+  int* pcodes = codes;
+  a.Perform(make_tuple(true, pcodes));
+  EXPECT_EQ(97, codes[0]);
+  EXPECT_EQ(98, codes[1]);
+  EXPECT_EQ(99, codes[2]);
+  EXPECT_EQ(444, codes[3]);
 }
 
 // Test SetArrayArgument<N>(first, last) with iterator as argument.

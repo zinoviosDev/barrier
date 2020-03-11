@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-#
 # Copyright 2006, Google Inc.
 # All rights reserved.
 #
@@ -31,24 +29,22 @@
 
 """Unit test utilities for Google C++ Mocking Framework."""
 
-__author__ = 'wan@google.com (Zhanyong Wan)'
-
 import os
 import sys
-
 
 # Determines path to gtest_test_utils and imports it.
 SCRIPT_DIR = os.path.dirname(__file__) or '.'
 
 # isdir resolves symbolic links.
-gtest_tests_util_dir = os.path.join(SCRIPT_DIR, '../gtest/test')
+gtest_tests_util_dir = os.path.join(SCRIPT_DIR, '../../googletest/test')
 if os.path.isdir(gtest_tests_util_dir):
   GTEST_TESTS_UTIL_DIR = gtest_tests_util_dir
 else:
-  GTEST_TESTS_UTIL_DIR = os.path.join(SCRIPT_DIR, '../../gtest/test')
-
+  GTEST_TESTS_UTIL_DIR = os.path.join(SCRIPT_DIR, '../../googletest/test')
 sys.path.append(GTEST_TESTS_UTIL_DIR)
-import gtest_test_utils  # pylint: disable-msg=C6204
+
+# pylint: disable=C6204
+import gtest_test_utils
 
 
 def GetSourceDir():
@@ -96,11 +92,12 @@ def GetExitStatus(exit_code):
 # Suppresses the "Invalid const name" lint complaint
 # pylint: disable-msg=C6409
 
-# Exposes Subprocess from gtest_test_utils.
+# Exposes utilities from gtest_test_utils.
 Subprocess = gtest_test_utils.Subprocess
-
-# Exposes TestCase from gtest_test_utils.
 TestCase = gtest_test_utils.TestCase
+environ = gtest_test_utils.environ
+SetEnvVar = gtest_test_utils.SetEnvVar
+PREMATURE_EXIT_FILE_ENV_VAR = gtest_test_utils.PREMATURE_EXIT_FILE_ENV_VAR
 
 # pylint: enable-msg=C6409
 

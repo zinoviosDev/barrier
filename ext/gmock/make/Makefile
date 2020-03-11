@@ -17,7 +17,7 @@
 # Points to the root of Google Test, relative to where this file is.
 # Remember to tweak this if you move this file, or if you want to use
 # a copy of Google Test at a different location.
-GTEST_DIR = ../gtest
+GTEST_DIR = ../../googletest
 
 # Points to the root of Google Mock, relative to where this file is.
 # Remember to tweak this if you move this file.
@@ -27,10 +27,13 @@ GMOCK_DIR = ..
 USER_DIR = ../test
 
 # Flags passed to the preprocessor.
-CPPFLAGS += -I$(GTEST_DIR)/include -I$(GMOCK_DIR)/include
+# Set Google Test and Google Mock's header directories as system
+# directories, such that the compiler doesn't generate warnings in
+# these headers.
+CPPFLAGS += -isystem $(GTEST_DIR)/include -isystem $(GMOCK_DIR)/include
 
 # Flags passed to the C++ compiler.
-CXXFLAGS += -g -Wall -Wextra
+CXXFLAGS += -g -Wall -Wextra -pthread
 
 # All tests produced by this Makefile.  Remember to add new tests you
 # created to the list.

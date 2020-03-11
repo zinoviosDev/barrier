@@ -29,11 +29,8 @@
 
 // Tests that a Google Test program that has no test defined can run
 // successfully.
-//
-// Author: wan@google.com (Zhanyong Wan)
 
 #include "gtest/gtest.h"
-
 
 int main(int argc, char **argv) {
   testing::InitGoogleTest(&argc, argv);

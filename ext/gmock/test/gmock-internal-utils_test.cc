@@ -26,8 +26,7 @@
 // THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-//
-// Author: wan@google.com (Zhanyong Wan)
+
 
 // Google Mock - a framework for writing C++ mock classes.
 //
@@ -36,6 +35,7 @@
 #include "gmock/internal/gmock-internal-utils.h"
 #include <stdlib.h>
 #include <map>
+#include <memory>
 #include <string>
 #include <sstream>
 #include <vector>
@@ -43,6 +43,15 @@
 #include "gmock/internal/gmock-port.h"
 #include "gtest/gtest.h"
 #include "gtest/gtest-spi.h"
+
+// Indicates that this translation unit is part of Google Test's
+// implementation.  It must come before gtest-internal-inl.h is
+// included, or there will be a compiler error.  This trick is to
+// prevent a user from accidentally including gtest-internal-inl.h in
+// their code.
+#define GTEST_IMPLEMENTATION_ 1
+#include "src/gtest-internal-inl.h"
+#undef GTEST_IMPLEMENTATION_
 
 #if GTEST_OS_CYGWIN
 # include <sys/types.h>  // For ssize_t. NOLINT
@@ -59,8 +68,25 @@ namespace internal {
 
 namespace {
 
-using ::std::tr1::make_tuple;
-using ::std::tr1::tuple;
+TEST(JoinAsTupleTest, JoinsEmptyTuple) {
+  EXPECT_EQ("", JoinAsTuple(Strings()));
+}
+
+TEST(JoinAsTupleTest, JoinsOneTuple) {
+  const char* fields[] = {"1"};
+  EXPECT_EQ("1", JoinAsTuple(Strings(fields, fields + 1)));
+}
+
+TEST(JoinAsTupleTest, JoinsTwoTuple) {
+  const char* fields[] = {"1", "a"};
+  EXPECT_EQ("(1, a)", JoinAsTuple(Strings(fields, fields + 2)));
+}
+
+TEST(JoinAsTupleTest, JoinsTenTuple) {
+  const char* fields[] = {"1", "2", "3", "4", "5", "6", "7", "8", "9", "10"};
+  EXPECT_EQ("(1, 2, 3, 4, 5, 6, 7, 8, 9, 10)",
+            JoinAsTuple(Strings(fields, fields + 10)));
+}
 
 TEST(ConvertIdentifierNameToWordsTest, WorksWhenNameContainsNoWord) {
   EXPECT_EQ("", ConvertIdentifierNameToWords(""));
@@ -99,6 +125,13 @@ TEST(ConvertIdentifierNameToWordsTest, WorksWhenNameIsMixture) {
 TEST(PointeeOfTest, WorksForSmartPointers) {
   CompileAssertTypesEqual<const char,
       PointeeOf<internal::linked_ptr<const char> >::type>();
+#if GTEST_HAS_STD_UNIQUE_PTR_
+  CompileAssertTypesEqual<int, PointeeOf<std::unique_ptr<int> >::type>();
+#endif  // GTEST_HAS_STD_UNIQUE_PTR_
+#if GTEST_HAS_STD_SHARED_PTR_
+  CompileAssertTypesEqual<std::string,
+                          PointeeOf<std::shared_ptr<std::string> >::type>();
+#endif  // GTEST_HAS_STD_SHARED_PTR_
 }
 
 TEST(PointeeOfTest, WorksForRawPointers) {
@@ -108,6 +141,17 @@ TEST(PointeeOfTest, WorksForRawPointers) {
 }
 
 TEST(GetRawPointerTest, WorksForSmartPointers) {
+#if GTEST_HAS_STD_UNIQUE_PTR_
+  const char* const raw_p1 = new const char('a');  // NOLINT
+  const std::unique_ptr<const char> p1(raw_p1);
+  EXPECT_EQ(raw_p1, GetRawPointer(p1));
+#endif  // GTEST_HAS_STD_UNIQUE_PTR_
+#if GTEST_HAS_STD_SHARED_PTR_
+  double* const raw_p2 = new double(2.5);  // NOLINT
+  const std::shared_ptr<double> p2(raw_p2);
+  EXPECT_EQ(raw_p2, GetRawPointer(p2));
+#endif  // GTEST_HAS_STD_SHARED_PTR_
+
   const char* const raw_p4 = new const char('a');  // NOLINT
   const internal::linked_ptr<const char> p4(raw_p4);
   EXPECT_EQ(raw_p4, GetRawPointer(p4));
@@ -250,7 +294,9 @@ TEST(LosslessArithmeticConvertibleTest, FloatingPointToFloatingPoint) {
 
   // Larger size => smaller size is not fine.
   EXPECT_FALSE((LosslessArithmeticConvertible<double, float>::value));
+  GTEST_INTENTIONAL_CONST_COND_PUSH_()
   if (sizeof(double) == sizeof(long double)) {  // NOLINT
+  GTEST_INTENTIONAL_CONST_COND_POP_()
     // In some implementations (e.g. MSVC), double and long double
     // have the same size.
     EXPECT_TRUE((LosslessArithmeticConvertible<long double, double>::value));
@@ -292,11 +338,10 @@ TEST(TupleMatchesTest, WorksForSize2) {
 
 TEST(TupleMatchesTest, WorksForSize5) {
   tuple<Matcher<int>, Matcher<char>, Matcher<bool>, Matcher<long>,  // NOLINT
-      Matcher<string> >
+        Matcher<std::string> >
       matchers(Eq(1), Eq('a'), Eq(true), Eq(2L), Eq("hi"));
-  tuple<int, char, bool, long, string>  // NOLINT
-      values1(1, 'a', true, 2L, "hi"),
-      values2(1, 'a', true, 2L, "hello"),
+  tuple<int, char, bool, long, std::string>  // NOLINT
+      values1(1, 'a', true, 2L, "hi"), values2(1, 'a', true, 2L, "hello"),
       values3(2, 'a', true, 2L, "hi");
 
   EXPECT_TRUE(TupleMatches(matchers, values1));
@@ -343,36 +388,30 @@ TEST(ExpectTest, FailsNonfatallyOnFalse) {
 class LogIsVisibleTest : public ::testing::Test {
  protected:
   virtual void SetUp() {
-    // The code needs to work when both ::string and ::std::string are
-    // defined and the flag is implemented as a
-    // testing::internal::String.  In this case, without the call to
-    // c_str(), the compiler will complain that it cannot figure out
-    // whether the String flag should be converted to a ::string or an
-    // ::std::string before being assigned to original_verbose_.
-    original_verbose_ = GMOCK_FLAG(verbose).c_str();
+    original_verbose_ = GMOCK_FLAG(verbose);
   }
 
   virtual void TearDown() { GMOCK_FLAG(verbose) = original_verbose_; }
 
-  string original_verbose_;
+  std::string original_verbose_;
 };
 
 TEST_F(LogIsVisibleTest, AlwaysReturnsTrueIfVerbosityIsInfo) {
   GMOCK_FLAG(verbose) = kInfoVerbosity;
-  EXPECT_TRUE(LogIsVisible(INFO));
-  EXPECT_TRUE(LogIsVisible(WARNING));
+  EXPECT_TRUE(LogIsVisible(kInfo));
+  EXPECT_TRUE(LogIsVisible(kWarning));
 }
 
 TEST_F(LogIsVisibleTest, AlwaysReturnsFalseIfVerbosityIsError) {
   GMOCK_FLAG(verbose) = kErrorVerbosity;
-  EXPECT_FALSE(LogIsVisible(INFO));
-  EXPECT_FALSE(LogIsVisible(WARNING));
+  EXPECT_FALSE(LogIsVisible(kInfo));
+  EXPECT_FALSE(LogIsVisible(kWarning));
 }
 
 TEST_F(LogIsVisibleTest, WorksWhenVerbosityIsWarning) {
   GMOCK_FLAG(verbose) = kWarningVerbosity;
-  EXPECT_FALSE(LogIsVisible(INFO));
-  EXPECT_TRUE(LogIsVisible(WARNING));
+  EXPECT_FALSE(LogIsVisible(kInfo));
+  EXPECT_TRUE(LogIsVisible(kWarning));
 }
 
 #if GTEST_HAS_STREAM_REDIRECTION
@@ -381,16 +420,16 @@ TEST_F(LogIsVisibleTest, WorksWhenVerbosityIsWarning) {
 
 // Verifies that Log() behaves correctly for the given verbosity level
 // and log severity.
-void TestLogWithSeverity(const string& verbosity, LogSeverity severity,
+void TestLogWithSeverity(const std::string& verbosity, LogSeverity severity,
                          bool should_print) {
-  const string old_flag = GMOCK_FLAG(verbose);
+  const std::string old_flag = GMOCK_FLAG(verbose);
   GMOCK_FLAG(verbose) = verbosity;
   CaptureStdout();
   Log(severity, "Test log.\n", 0);
   if (should_print) {
     EXPECT_THAT(GetCapturedStdout().c_str(),
                 ContainsRegex(
-                    severity == WARNING ?
+                    severity == kWarning ?
                     "^\nGMOCK WARNING:\nTest log\\.\nStack trace:\n" :
                     "^\nTest log\\.\nStack trace:\n"));
   } else {
@@ -402,63 +441,86 @@ void TestLogWithSeverity(const string& verbosity, LogSeverity severity,
 // Tests that when the stack_frames_to_skip parameter is negative,
 // Log() doesn't include the stack trace in the output.
 TEST(LogTest, NoStackTraceWhenStackFramesToSkipIsNegative) {
-  const string saved_flag = GMOCK_FLAG(verbose);
+  const std::string saved_flag = GMOCK_FLAG(verbose);
   GMOCK_FLAG(verbose) = kInfoVerbosity;
   CaptureStdout();
-  Log(INFO, "Test log.\n", -1);
+  Log(kInfo, "Test log.\n", -1);
   EXPECT_STREQ("\nTest log.\n", GetCapturedStdout().c_str());
   GMOCK_FLAG(verbose) = saved_flag;
 }
 
+struct MockStackTraceGetter : testing::internal::OsStackTraceGetterInterface {
+  virtual std::string CurrentStackTrace(int max_depth, int skip_count) {
+    return (testing::Message() << max_depth << "::" << skip_count << "\n")
+        .GetString();
+  }
+  virtual void UponLeavingGTest() {}
+};
+
 // Tests that in opt mode, a positive stack_frames_to_skip argument is
 // treated as 0.
 TEST(LogTest, NoSkippingStackFrameInOptMode) {
+  MockStackTraceGetter* mock_os_stack_trace_getter = new MockStackTraceGetter;
+  GetUnitTestImpl()->set_os_stack_trace_getter(mock_os_stack_trace_getter);
+
   CaptureStdout();
-  Log(WARNING, "Test log.\n", 100);
-  const String log = GetCapturedStdout();
+  Log(kWarning, "Test log.\n", 100);
+  const std::string log = GetCapturedStdout();
 
-# if defined(NDEBUG) && GTEST_GOOGLE3_MODE_
+  std::string expected_trace =
+      (testing::Message() << GTEST_FLAG(stack_trace_depth) << "::").GetString();
+  std::string expected_message =
+      "\nGMOCK WARNING:\n"
+      "Test log.\n"
+      "Stack trace:\n" +
+      expected_trace;
+  EXPECT_THAT(log, HasSubstr(expected_message));
+  int skip_count = atoi(log.substr(expected_message.size()).c_str());
 
+# if defined(NDEBUG)
   // In opt mode, no stack frame should be skipped.
-  EXPECT_THAT(log, ContainsRegex("\nGMOCK WARNING:\n"
-                                 "Test log\\.\n"
-                                 "Stack trace:\n"
-                                 ".+"));
+  const int expected_skip_count = 0;
 # else
-
   // In dbg mode, the stack frames should be skipped.
-  EXPECT_STREQ("\nGMOCK WARNING:\n"
-               "Test log.\n"
-               "Stack trace:\n", log.c_str());
+  const int expected_skip_count = 100;
 # endif
+
+  // Note that each inner implementation layer will +1 the number to remove
+  // itself from the trace. This means that the value is a little higher than
+  // expected, but close enough.
+  EXPECT_THAT(skip_count,
+              AllOf(Ge(expected_skip_count), Le(expected_skip_count + 10)));
+
+  // Restores the default OS stack trace getter.
+  GetUnitTestImpl()->set_os_stack_trace_getter(NULL);
 }
 
 // Tests that all logs are printed when the value of the
 // --gmock_verbose flag is "info".
 TEST(LogTest, AllLogsArePrintedWhenVerbosityIsInfo) {
-  TestLogWithSeverity(kInfoVerbosity, INFO, true);
-  TestLogWithSeverity(kInfoVerbosity, WARNING, true);
+  TestLogWithSeverity(kInfoVerbosity, kInfo, true);
+  TestLogWithSeverity(kInfoVerbosity, kWarning, true);
 }
 
 // Tests that only warnings are printed when the value of the
 // --gmock_verbose flag is "warning".
 TEST(LogTest, OnlyWarningsArePrintedWhenVerbosityIsWarning) {
-  TestLogWithSeverity(kWarningVerbosity, INFO, false);
-  TestLogWithSeverity(kWarningVerbosity, WARNING, true);
+  TestLogWithSeverity(kWarningVerbosity, kInfo, false);
+  TestLogWithSeverity(kWarningVerbosity, kWarning, true);
 }
 
 // Tests that no logs are printed when the value of the
 // --gmock_verbose flag is "error".
 TEST(LogTest, NoLogsArePrintedWhenVerbosityIsError) {
-  TestLogWithSeverity(kErrorVerbosity, INFO, false);
-  TestLogWithSeverity(kErrorVerbosity, WARNING, false);
+  TestLogWithSeverity(kErrorVerbosity, kInfo, false);
+  TestLogWithSeverity(kErrorVerbosity, kWarning, false);
 }
 
 // Tests that only warnings are printed when the value of the
 // --gmock_verbose flag is invalid.
 TEST(LogTest, OnlyWarningsArePrintedWhenVerbosityIsInvalid) {
-  TestLogWithSeverity("invalid", INFO, false);
-  TestLogWithSeverity("invalid", WARNING, true);
+  TestLogWithSeverity("invalid", kInfo, false);
+  TestLogWithSeverity("invalid", kWarning, true);
 }
 
 #endif  // GTEST_HAS_STREAM_REDIRECTION
@@ -502,8 +564,8 @@ TEST(TypeTraitsTest, remove_reference) {
 
 // Verifies that Log() behaves correctly for the given verbosity level
 // and log severity.
-String GrabOutput(void(*logger)(), const char* verbosity) {
-  const string saved_flag = GMOCK_FLAG(verbose);
+std::string GrabOutput(void(*logger)(), const char* verbosity) {
+  const std::string saved_flag = GMOCK_FLAG(verbose);
   GMOCK_FLAG(verbose) = verbosity;
   CaptureStdout();
   logger();
@@ -525,7 +587,7 @@ void ExpectCallLogger() {
 
 // Verifies that EXPECT_CALL logs if the --gmock_verbose flag is set to "info".
 TEST(ExpectCallTest, LogsWhenVerbosityIsInfo) {
-  EXPECT_THAT(GrabOutput(ExpectCallLogger, kInfoVerbosity),
+  EXPECT_THAT(std::string(GrabOutput(ExpectCallLogger, kInfoVerbosity)),
               HasSubstr("EXPECT_CALL(mock, TestMethod())"));
 }
 
@@ -548,7 +610,7 @@ void OnCallLogger() {
 
 // Verifies that ON_CALL logs if the --gmock_verbose flag is set to "info".
 TEST(OnCallTest, LogsWhenVerbosityIsInfo) {
-  EXPECT_THAT(GrabOutput(OnCallLogger, kInfoVerbosity),
+  EXPECT_THAT(std::string(GrabOutput(OnCallLogger, kInfoVerbosity)),
               HasSubstr("ON_CALL(mock, TestMethod())"));
 }
 
@@ -571,7 +633,7 @@ void OnCallAnyArgumentLogger() {
 
 // Verifies that ON_CALL prints provided _ argument.
 TEST(OnCallTest, LogsAnythingArgument) {
-  EXPECT_THAT(GrabOutput(OnCallAnyArgumentLogger, kInfoVerbosity),
+  EXPECT_THAT(std::string(GrabOutput(OnCallAnyArgumentLogger, kInfoVerbosity)),
               HasSubstr("ON_CALL(mock, TestMethodArg(_)"));
 }
 
