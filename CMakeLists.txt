@@ -344,7 +344,7 @@ elseif (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
         )
     endif()
 
-elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+elseif (${CMAKE_SYSTEM_NAME} MATCHES "Linux|.*BSD|DragonFly")
     set (OPENSSL_LIBS ssl crypto)
 else()
     find_library (lib_ssl ssl)
@@ -426,9 +426,9 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Windows")
 endif()
 
 #
-# Linux installation
+# Linux/BSD installation
 #
-if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux|.*BSD|DragonFly")
     configure_files (${CMAKE_CURRENT_SOURCE_DIR}/dist/rpm ${CMAKE_BINARY_DIR}/rpm)
     install(FILES res/barrier.svg DESTINATION share/icons/hicolor/scalable/apps)
     if("${VERSION_MAJOR}" STREQUAL "2") 
