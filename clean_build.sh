@@ -35,9 +35,6 @@ if [ "$(uname)" = "Darwin" ]; then
         . ./macOS_environment.sh
     fi
 
-    # We build a Universal macOS Binary, which supports M1 and Intel processors (64-bit)
-    CMAKE_OSX_ARCHITECTURES="arm64;x86_64"
-
     B_CMAKE_FLAGS="-DCMAKE_OSX_SYSROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 ${B_CMAKE_FLAGS:-}"
 fi
 
