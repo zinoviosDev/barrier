@@ -420,6 +420,8 @@ if (${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     set (BARRIER_BUNDLE_APP_DIR ${BARRIER_BUNDLE_DIR}/Barrier.app)
     set (BARRIER_BUNDLE_BINARY_DIR ${BARRIER_BUNDLE_APP_DIR}/Contents/MacOS)
 
+    set (CMAKE_OSX_ARCHITECTURES "arm64;x86_64")
+    
     configure_files (${BARRIER_BUNDLE_SOURCE_DIR} ${BARRIER_BUNDLE_DIR})
 
     add_custom_target(Barrier_MacOS ALL
