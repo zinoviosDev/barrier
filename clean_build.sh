@@ -9,10 +9,8 @@ B_CMAKE=$(command -v cmake3 2>/dev/null)
 if [ "$?" -eq 0 ]; then
     continue
 else
-    # OK, so cmake3 isn't in path, so let's test to see if `cmake` itself exists, before proceeding.
     if command -v cmake 2>/dev/null; then
         B_CMAKE=$(command -v cmake)
-        # We have a cmake executable available, now let's proceed!
     else
         echo "ERROR: CMake not in $PATH, cannot build! Please install CMake, or if this persists, file a bug report."
         exit 1
