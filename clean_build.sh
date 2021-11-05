@@ -29,9 +29,7 @@ fi
 
 # Source local build variables to the environment, if available.
 # If not, continue as normal, and silently.
-if [ -e "./build_env.sh" ]; then
-    . "./build_env.sh"
-fi
+[ -e "./build_env.sh" ] && . "./build_env.sh"
 
 # Initialise Git submodules
 git submodule update --init --recursive
