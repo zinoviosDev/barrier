@@ -7,7 +7,6 @@ cd "$(dirname "$0")" || exit 1
 
 B_CMAKE=$(command -v cmake3 2>/dev/null)
 if [ "$?" -eq 0 ]; then
-    # Continue, cmake3 exists in $PATH.
     continue
 else
     # OK, so cmake3 isn't in path, so let's test to see if `cmake` itself exists, before proceeding.
@@ -15,14 +14,10 @@ else
         B_CMAKE=$(command -v cmake)
         # We have a cmake executable available, now let's proceed!
     else
-        # As self-explanatory, the cmake executable isn't available, so we should fail here.
         echo "ERROR: CMake not in $PATH, cannot build! Please install CMake, or if this persists, file a bug report."
         exit 1
     fi
 fi
-
-# Set default build type, but in CI, this is set to Release.
-# For downstream distributions, our recommendation is to set this type in your build scripts to Release, and supply Debug build types in your debug packages.
 
 B_BUILD_TYPE=${B_BUILD_TYPE:-Debug}
 
@@ -57,18 +52,10 @@ fi
 
 # Previous versions of this script created the build directory, and CD'd into it - CMake allows us to do this another way...
 
-# Note: If you use Ninja (i.e, cmake -GNinja -B build), run Ninja like: "ninja -C build", just like you would with Meson.
-
 $B_CMAKE "$B_CMAKE_FLAGS" -B build || exit 1
-
 
 echo "INFO: Now commencing Barrier build process..."
 echo "INFO: We're building an $B_BUILD_TYPE output type."
 $(command -v make) -C build || exit 1
-
-# Implictly, we assume the build was successful due to no exits.
-# Later revisions of this script should do conditionals. TODO.
-
-echo "INFO: Success! The build completed successfully!"
 
 exit
