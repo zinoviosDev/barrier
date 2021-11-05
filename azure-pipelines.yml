@@ -121,28 +121,9 @@ jobs:
       displayName: Install Qt5 and pkg-config prereqs
     - script: sh -x ./clean_build.sh
       displayName: Clean Build
-
-- job: macOSRelease
-  displayName: macOS Universal Binary Release Builds
-  pool:
-    vmImage: "macOS-11"
-  variables:
-    VERBOSE: 1
-    TERM: xterm-256color
-    B_BUILD_TYPE: Release
-    BARRIER_VERSION_STAGE: Release
-  steps:
-    - script: rm -rf /usr/local/opt/openssl
-      displayName: Remove incompatible OpenSSL 1.0.2t from macOS-10.14 vmImage
-    - script: brew reinstall openssl
-      displayName: Installed newer OpenSSL 1.1.x
-    - script: brew install pkg-config qt5
-      displayName: Install Qt5 and pkg-config prereqs
-    - script: sh -x ./clean_build.sh
-      displayName: Clean Build
     - task: PublishBuildArtifacts@1
-      displayName: Publish Release DMG
-      condition: eq(variables['B_BUILD_TYPE'], 'Release')
+      displayName: Publish Release DMG if on Big Sur agent
+      condition: and(eq(variables['B_BUILD_TYPE'], 'Release'), eq(variables['imageName'], 'macOS-11'))
       inputs:
         pathtoPublish: build/bundle
         artifactName: Universal Binary for macOS
