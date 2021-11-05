@@ -38,11 +38,7 @@ fi
 # Initialise Git submodules
 git submodule update --init --recursive
 
-# Clear build directory, but do a conditional first!
-
-if [ -d "./build" ]; then
-    rm -rf ./build
-fi
+rm -rf ./build
 
 # Previous versions of this script created the build directory, and CD'd into it - CMake allows us to do this another way...
 
