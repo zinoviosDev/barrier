@@ -39,13 +39,13 @@ fi
 git submodule update --init --recursive
 
 rm -rf ./build
+mkdir build
+cd ./build
 
-# Previous versions of this script created the build directory, and CD'd into it - CMake allows us to do this another way...
-
-$B_CMAKE "$B_CMAKE_FLAGS" -B build || exit 1
+$B_CMAKE "$B_CMAKE_FLAGS" .. || exit 1
 
 echo "INFO: Now commencing Barrier build process..."
 echo "INFO: We're building an $B_BUILD_TYPE output type."
-$(command -v make) -C build || exit 1
+$(command -v make) || exit 1
 
 exit
