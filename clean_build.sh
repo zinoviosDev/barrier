@@ -19,7 +19,8 @@ else
     fi
 fi
 
-B_BUILD_TYPE=${B_BUILD_TYPE:-Debug}
+B_BUILD_TYPE="${B_BUILD_TYPE:-Debug}"
+B_CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${B_BUILD_TYPE} ${B_CMAKE_FLAGS:-}"
 
 if [ "$(uname)" = "Darwin" ]; then
     # macOS needs a little help, so we source this environment script to fix paths.
@@ -30,7 +31,7 @@ if [ "$(uname)" = "Darwin" ]; then
         . ./macOS_environment.sh
     fi
 
-    B_CMAKE_FLAGS="-DCMAKE_OSX_SYSROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9 ${B_CMAKE_FLAGS:-}"
+    B_CMAKE_FLAGS="${B_CMAKE_FLAGS} -DCMAKE_OSX_SYSROOT=$(xcode-select --print-path)/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk -DCMAKE_OSX_DEPLOYMENT_TARGET=10.9"
 fi
 
 # Source local build variables to the environment, if available.
@@ -41,8 +42,6 @@ fi
 
 # Initialise Git submodules
 git submodule update --init --recursive
-
-B_CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=${B_BUILD_TYPE} ${B_CMAKE_FLAGS:-}"
 
 # Clear build directory, but do a conditional first!
 
