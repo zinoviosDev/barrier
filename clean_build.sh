@@ -43,3 +43,5 @@ $B_CMAKE "$B_CMAKE_FLAGS" .. || exit 1
 echo "INFO: Now commencing Barrier build process..."
 echo "INFO: We're building an $B_BUILD_TYPE output type."
 $(command -v make) || exit 1
+
+echo "Build completed successfully"
