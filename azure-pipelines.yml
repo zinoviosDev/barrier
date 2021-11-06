@@ -83,18 +83,6 @@ jobs:
   displayName: macOS builds
   strategy:
     matrix:
-      big-sur-Debug:
-          imageName: "macOS-11"
-          B_BUILD_TYPE: Debug
-          BARRIER_VERSION_STAGE: Debug
-      catalina-Debug:
-          imageName: "macOS-10.15"
-          B_BUILD_TYPE: Debug
-          BARRIER_VERSION_STAGE: Debug
-      mojave-Debug:
-          imageName: "macOS-10.14"
-          B_BUILD_TYPE: Debug
-          BARRIER_VERSION_STAGE: Debug
       big-sur-Release:
           imageName: "macOS-11"
           B_BUILD_TYPE: Release
