@@ -126,4 +126,4 @@ jobs:
       condition: and(eq(variables['B_BUILD_TYPE'], 'Release'), eq(variables['imageName'], 'macOS-11'))
       inputs:
         pathtoPublish: build/bundle
-        artifactName: Release DMG for macOS - no M1 support yet
+        artifactName: Mac Release DMG and App $(imageName)
