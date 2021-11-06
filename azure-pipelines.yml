@@ -123,7 +123,7 @@ jobs:
       displayName: Clean Build
     - task: PublishBuildArtifacts@1
       displayName: Publish Release DMG if on Big Sur agent
-      condition: and(eq(variables['B_BUILD_TYPE'], 'Release'), eq(variables['imageName'], 'macOS-11'))
+      condition: eq(variables['imageName'], 'macOS-11')
       inputs:
         pathtoPublish: build/bundle
         artifactName: Mac Release DMG and App $(imageName)
