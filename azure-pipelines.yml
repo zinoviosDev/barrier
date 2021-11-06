@@ -79,8 +79,8 @@ jobs:
     - script: sh -x ./clean_build.sh
       displayName: Clean Build
 
-- job: macOStests
-  displayName: macOS Tests
+- job: MacBuild
+  displayName: macOS builds
   strategy:
     matrix:
       big-sur-Debug:
